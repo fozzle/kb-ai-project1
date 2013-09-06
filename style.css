@@ -1,4 +1,4 @@
-tr#_1 td {
+#_1 td {
 	border-top: 1px solid black;
 	border-bottom: 1px solid black;
 }
@@ -6,6 +6,11 @@ tr#_1 td {
 td.middle {
 	border-right: 1px solid black;
 	border-left: 1px solid black;
+}
+
+table {
+	border-spacing: 0px;
+	border-collapse: collapse;
 }
 
 td {

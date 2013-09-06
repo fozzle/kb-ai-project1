@@ -117,11 +117,7 @@ var Game = function(playerX, playerO, speed) {
       return true;
     }
 
-
-
-
     return false;
-
   }
 }
 
@@ -293,22 +289,26 @@ var SmartPlayer = function(symbol) {
 var game;
 
 function playNaiveVersusNaive() {
-  game = new Game(NaivePlayer, NaivePlayer);
+  var speed = parseFloat(document.getElementById("speed").value) * 1000;
+  game = new Game(NaivePlayer, NaivePlayer, speed);
   game.play();
 }
 
 function playNaiveVersusSmart() {
-  game = new Game(NaivePlayer, SmartPlayer);
+  var speed = parseFloat(document.getElementById("speed").value) * 1000;
+  game = new Game(NaivePlayer, SmartPlayer, speed);
   game.play();
 }
 
 function playSmartVersusSmart() {
-  game = new Game(SmartPlayer, SmartPlayer);
+  var speed = parseFloat(document.getElementById("speed").value) * 1000;
+  game = new Game(SmartPlayer, SmartPlayer, speed);
   game.play();
 }
 
 function playSmartVersusNaive() {
-  game = new Game(SmartPlayer, NaivePlayer);
+  var speed = parseFloat(document.getElementById("speed").value) * 1000;
+  game = new Game(SmartPlayer, NaivePlayer, speed);
   game.play();
 }
 
