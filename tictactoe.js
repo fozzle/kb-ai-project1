@@ -1,10 +1,8 @@
-var Game = function(playerX, playerO) {
-  this.playerX = new playerX('X');
-  this.playerO = new playerO('O');
-
+var Game = function(playerX, playerO, speed) {
+  this.players = [new playerX('X'), new playerO('O')];
   this.board = [[null, null, null],[null, null, null],[null, null, null]];
   this.move = 0;
-
+  this.speed = speed ? speed : 1000;
 
   // Clear the board array, log, and TDs in preparation for a new game.
   this.clear = function() {
@@ -30,32 +28,44 @@ var Game = function(playerX, playerO) {
 
   Game.prototype.play = function() {
     this.clear();
-    while (true) {
-      var space = this.playerX.move(this.board, 'X');
-      this.writeLog('X', space);
-      this.move++;
-      if(this.checkWin(space, this.playerX)) {
-        alert("player X wins");
-        return;
-      }
+    this.playHelper();
+  };
 
-      // X will always be last!
-      if (this.move >= 9) {
+  Game.prototype.gameFinished = function(status) {
+    switch (status) {
+      case "draw":
+        alert("ended in a draw!");
         break;
-      }
-
-      
-      space = this.playerO.move(this.board, 'O');
-      this.writeLog('O', space);
-      this.move++;
-      if(this.checkWin(space, this.playerO)) {
+      case "X":
+        alert("player X wins");
+        break;
+      case "O":
         alert("player O wins");
-        return;
-      }
+        break;
+    }
+  }
+
+  // This will keep calling itself, moving the current player.
+  // Updates the board at a rate of 1 move per second.
+  Game.prototype.playHelper = function() {
+
+    // X will always be last!
+    if (this.move >= 9) {
+      return this.gameFinished("draw");
     }
 
-    return alert("The game was a draw!");
-  };
+    var player = this.players[this.move % this.players.length];
+    var space = player.move(this.board);
+    this.writeLog(player.symbol, space);
+    this.move++;
+    if(this.checkWin(space, player)) {
+      return this.gameFinished(player.symbol);
+    }
+
+    var self = this;
+    setTimeout(function() { self.playHelper.apply(self, []); }, this.speed);
+
+  }
 
   Game.prototype.checkWin = function(space, player) {
     var symbol = player.symbol;
@@ -112,19 +122,6 @@ var Game = function(playerX, playerO) {
 
     return false;
 
-  }
-
-
-  // See if there is a draw.
-  Game.prototype.checkFull = function() {
-    for (var i = 0; i < this.board.length; i++) {
-      for (var j = 0; j < this.board[i].length; j++) {
-        if (this.board[i][j] !== null) {
-          return false;
-        }
-      }
-    }
-    return true;
   }
 }
 
