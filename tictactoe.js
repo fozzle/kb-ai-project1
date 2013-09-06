@@ -56,8 +56,20 @@ var Game = function(playerX, playerO, speed) {
 
     var player = this.players[this.move % this.players.length];
     var space = player.move(this.board);
+
+    // Add to the internal representation of the board. 
+    this.board[space.row][space.col] = player.symbol;
+
+    // Draw to the board.
+    var tableRow = document.getElementById("_" + space.row);
+    tableRow.children[space.col].appendChild(document.createTextNode(player.symbol));
+    
+    // Write to the log.
     this.writeLog(player.symbol, space);
+
     this.move++;
+
+    // See if they won with that move.
     if(this.checkWin(space, player)) {
       return this.gameFinished(player.symbol);
     }
@@ -132,10 +144,6 @@ var NaivePlayer = function(symbol) {
       var col = Math.round(Math.random() * (board[row].length -1));
 
       if (!board[row][col]) {
-        board[row][col] = this.symbol;
-        var tableRow = document.getElementById("_" + row);
-        tableRow.children[col].appendChild(document.createTextNode(this.symbol));
-
         return {row: row, col: col, rule:"random"};
       }
     }
@@ -158,11 +166,6 @@ var SmartPlayer = function(symbol) {
     for (var i = 0; i < this.rules.length; i++) {
       var position = this.rules[i].apply(this, [board]);
       if (position) {
-
-        board[position.row][position.col] = this.symbol;
-        var tableRow = document.getElementById("_" + position.row);
-        tableRow.children[position.col].appendChild(document.createTextNode(this.symbol));
-
         position.rule = i;
         return position;
       }
@@ -265,7 +268,6 @@ var SmartPlayer = function(symbol) {
 
   // Place next to occupied spot on board if row is open.
   SmartPlayer.prototype.checkAdjacent = function(board) {
-    console.log("checking adjacent for player", this.symbol);
     return this.checkScore(board, this.symbol, 1);
   }
 
