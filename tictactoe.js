@@ -1,8 +1,9 @@
-var Game = function(playerX, playerO, speed) {
+var Game = function(playerX, playerO, speed, callback) {
   this.players = [new playerX('X'), new playerO('O')];
   this.board = [[null, null, null],[null, null, null],[null, null, null]];
   this.move = 0;
-  this.speed = speed ? speed : 1000;
+  this.speed = speed !== undefined ? speed : 1000;
+  this.callback = callback;
 
   // Clear the board array, log, and TDs in preparation for a new game.
   this.clear = function() {
@@ -32,6 +33,10 @@ var Game = function(playerX, playerO, speed) {
   };
 
   Game.prototype.gameFinished = function(status) {
+    if (this.callback) {
+      return this.callback(status);
+    } 
+
     switch (status) {
       case "draw":
         alert("ended in a draw!");
@@ -43,6 +48,8 @@ var Game = function(playerX, playerO, speed) {
         alert("player O wins");
         break;
     }
+
+    
   }
 
   // This will keep calling itself, moving the current player.
@@ -60,12 +67,17 @@ var Game = function(playerX, playerO, speed) {
     // Add to the internal representation of the board. 
     this.board[space.row][space.col] = player.symbol;
 
-    // Draw to the board.
-    var tableRow = document.getElementById("_" + space.row);
-    tableRow.children[space.col].appendChild(document.createTextNode(player.symbol));
-    
-    // Write to the log.
-    this.writeLog(player.symbol, space);
+
+    // If a callback was supplied, we are doing something else with the data, 
+    // so don't mess with the DOM.
+    if (!this.callback) {
+      // Draw to the board.
+      var tableRow = document.getElementById("_" + space.row);
+      tableRow.children[space.col].appendChild(document.createTextNode(player.symbol));
+      
+      // Write to the log.
+      this.writeLog(player.symbol, space);
+    }
 
     this.move++;
 
@@ -271,6 +283,27 @@ var SmartPlayer = function(symbol) {
     return this.checkScore(board, this.symbol, 1);
   }
 
+  SmartPlayer.prototype.checkCenter = function(board) {
+    if (!board[1][1]) {
+      return {row: 1, col: 1};
+    }
+  }
+
+  SmartPlayer.prototype.checkCorners = function(board) {
+    var corners = [{row: 0, col: 0}, {row: 0, col: board.length - 1}, {row: board.length - 1, col: 0}, {row: board.length - 1, col: board.length - 1}];
+    var openCorners = [];
+    // Find open corners. Pick one at random.
+    for (var i = 0; i < corners.length; i++) {
+      if (!board[corners[i].row][corners[i].col]) {
+        openCorners.push(corners[i]);
+      }
+    }
+
+    if (openCorners.length) {
+      return openCorners[Math.floor(Math.random() * openCorners.length)];
+    }
+  }
+
   // Place at random.
   SmartPlayer.prototype.checkRandom = function(board) {
     while (true) {
@@ -283,13 +316,14 @@ var SmartPlayer = function(symbol) {
     }
   }
 
-  this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkRandom];
+  this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkCenter,  this.checkCorners, this.checkRandom];
 
 
 };
 
 var game;
 
+// Single play games
 function playNaiveVersusNaive() {
   var speed = parseFloat(document.getElementById("speed").value) * 1000;
   game = new Game(NaivePlayer, NaivePlayer, speed);
@@ -314,10 +348,67 @@ function playSmartVersusNaive() {
   game.play();
 }
 
+
+// Bulk game runners
+function playNaiveVersusNaivex100() {
+  var results = {"draw": 0, "X": 0, "O": 0};
+
+  for (var i = 0; i < 100; i++) {
+    game = new Game(NaivePlayer, NaivePlayer, 0, function(result) {
+      results[result]++;
+      document.getElementById("game-log").innerHTML = "<li>Draws: " + results.draw + "</li><li>X Wins: " + results.X + "</li><li>O Wins: " + results.O + "</li>";
+    });
+    game.play();
+  }
+}
+
+function playNaiveVersusSmartx100() {
+  var results = {"draw": 0, "X": 0, "O": 0};
+
+  for (var i = 0; i < 100; i++) {
+    game = new Game(NaivePlayer, SmartPlayer, 0, function(result) {
+      results[result]++;
+      document.getElementById("game-log").innerHTML = "<li>Draws: " + results.draw + "</li><li>X Wins: " + results.X + "</li><li>O Wins: " + results.O + "</li>";
+    });
+    game.play();
+  }
+}
+
+function playSmartVersusSmartx100() {
+  var results = {"draw": 0, "X": 0, "O": 0};
+
+  for (var i = 0; i < 100; i++) {
+    game = new Game(SmartPlayer, SmartPlayer, 0, function(result) {
+      results[result]++;
+      document.getElementById("game-log").innerHTML = "<li>Draws: " + results.draw + "</li><li>X Wins: " + results.X + "</li><li>O Wins: " + results.O + "</li>";
+    });
+    game.play();
+  }
+}
+
+function playSmartVersusNaivex100() {
+  var results = {"draw": 0, "X": 0, "O": 0};
+  
+  for (var i = 0; i < 100; i++) {
+    game = new Game(SmartPlayer, NaivePlayer, 0, function(result) {
+      results[result]++;
+      document.getElementById("game-log").innerHTML = "<li>Draws: " + results.draw + "</li><li>X Wins: " + results.X + "</li><li>O Wins: " + results.O + "</li>";
+    });
+    game.play();
+  }
+}
+
 window.onload = function() {
+  // Single game buttons
   document.getElementById("nvn").addEventListener("click", playNaiveVersusNaive);
   document.getElementById("nvs").addEventListener("click", playNaiveVersusSmart);
   document.getElementById("svs").addEventListener("click", playSmartVersusSmart);
   document.getElementById("svn").addEventListener("click", playSmartVersusNaive);
+
+  // Bulk game buttons
+  document.getElementById("nvnx100").addEventListener("click", playNaiveVersusNaivex100);
+  document.getElementById("nvsx100").addEventListener("click", playNaiveVersusSmartx100);
+  document.getElementById("svsx100").addEventListener("click", playSmartVersusSmartx100);
+  document.getElementById("svnx100").addEventListener("click", playSmartVersusNaivex100);
 }
 
