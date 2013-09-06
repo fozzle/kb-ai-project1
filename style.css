@@ -1,0 +1,24 @@
+tr#_1 td {
+	border-top: 1px solid black;
+	border-bottom: 1px solid black;
+}
+
+td.middle {
+	border-right: 1px solid black;
+	border-left: 1px solid black;
+}
+
+td {
+	height: 30px;
+	width: 30px;
+	text-align: center;
+}
+
+button {
+	margin: 10px;
+}
+
+/*#game-log {
+	height: 200px;
+	width: 200px;
+}*/
