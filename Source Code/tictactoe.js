@@ -1,5 +1,5 @@
 var Game = function(playerX, playerO, speed, callback) {
-  this.players = [new playerX('X'), new playerO('O')];
+  this.players = [new playerX('X', this), new playerO('O', this)];
   this.board = [[null, null, null],[null, null, null],[null, null, null]];
   this.move = 0;
   this.speed = speed !== undefined ? speed : 1000;
@@ -143,6 +143,102 @@ var Game = function(playerX, playerO, speed, callback) {
 
     return false;
   }
+
+  Game.prototype.getSpot = function(x,y) {
+    return board[x][y];
+  };
+
+  Game.prototype.horizontalScores = function() {
+    var symbols = ["X", "O"];
+    var scores = {
+      "X": {},
+      "O": {}
+    };
+
+
+    for (var symbol = 0; symbol < symbols.length; symbol++) {
+      for (var row=0; row < this.board.length; row++) {
+        var score = 0;
+        for (var col=0; col < this.board.length; col++) {
+          var spot = this.getSpot(row, col);
+          if (spot == symbols[symbol]) {
+            score++;
+          } else if (spot == symbols[(symbol + 1) % symbols.length]) {
+            score--;
+          }
+        }
+        scores[symbols[symbol]][row] = score;
+      }
+    }
+  };
+
+  Game.prototype.verticalScores = function() {
+    var symbols = ["X", "O"];
+    var scores = {
+      "X": {},
+      "O": {}
+    };
+
+
+    for (var symbol = 0; symbol < symbols.length; symbol++) {
+      for (var col=0; col < this.board.length; col++) {
+        var score = 0;
+        for (var row=0; row < this.board.length; row++) {
+          var spot = this.getSpot(row, col);
+          if (spot == symbols[symbol]) {
+            score++;
+          } else if (spot == symbols[(symbol + 1) % symbols.length]) {
+            score--;
+          }
+        }
+        scores[symbols[symbol]][col] = score;
+      }
+    }
+  };
+
+  Game.prototype.diagScores = function() {
+    var symbols = ["X", "O"];
+    var scores = {
+      "X": {},
+      "O": {}
+    };
+
+    for (var symbol = 0; symbol < symbols.length; symbol++) {
+
+      score = 0;
+      // Top left to bottom right;
+      for (var i = 0; i < this.board.length; i++) {
+        var spot = this.getSpot(i, i);
+        if (spot == symbols[symbol]) {
+          score++;
+        } else if (spot !== null) {
+          score--;
+        }
+      }
+      scores[symbols[symbol]][0] = score;
+
+      score = 0;
+      // top right to bottom left;
+      for (var i = 0; i < this.board.length; i++) {
+        var spot = this.getSpot(i, this.board.length - 1 - i);
+        if (spot == symbols[symbol]) {
+          score++;
+        } else if (spot !== null) {
+          score--;
+        }
+      }
+      scores[symbols[symbol]][1] = score;
+  };
+
+  Game.prototype.checkScore = function(symbol) {
+    var symbols = ["X", "O"];
+    var scores = {};
+    scores.horizontal = this.horizontalScores();
+    scores.vertical = this.verticalScores();
+    scores.diagnol = this.diagScores();
+    return scores;
+  }
+    
 }
 
 var NaivePlayer = function(symbol) {
@@ -163,8 +259,9 @@ var NaivePlayer = function(symbol) {
 
 };
 
-var SmartPlayer = function(symbol) {
+var SmartPlayer = function(symbol, game) {
   this.symbol = symbol;
+  this.game = game;
   var self = this;
   
   SmartPlayer.prototype.move = function(board) {
@@ -176,7 +273,7 @@ var SmartPlayer = function(symbol) {
     * 4.) Place something down at random.
     */
     for (var i = 0; i < this.rules.length; i++) {
-      var position = this.rules[i].apply(this, [board]);
+      var position = this.rules[i].apply(this, []);
       if (position) {
         position.rule = i;
         return position;
@@ -184,117 +281,125 @@ var SmartPlayer = function(symbol) {
     }
   };
 
-  // Check to see if a symbol meets a certain score
-  // returns false if no matching score, returns 
-  // {row, col} object if there is, with row/col representing
-  // where the piece should be placed if there is a move matching the score.
-  SmartPlayer.prototype.checkScore = function(board, symbol, requiredScore) {
-
-    for (var row=0; row < board.length; row++) {
-      for (var col=0; col < board[row].length; col++) {
-        if (board[row][col] == symbol) {
-
-          // Ah, we've found the symbol we are looking for. We need to
-          // determine the score for the verticals, diags, and horizontals.
-          // Heuristic score formula: for every symbol matching, add 1. For every opposite symbol, subtract 1.
-
-          var score = 0;
-          var blank;
-
-          // Check horizontal
-          for (var i = 0; i < board[row].length; i++) {
-            if (board[row][i] == symbol) {
-              score++;
-            } else if (board[row][i] !== null) {
-              score--;
-            } else {
-              blank = {row: row, col: i}
+  /* Helper method to return all "slots" with appropriate score */
+  SmartPlayer.prototype.testScore = function(symbol, requiredScore) {
+    var validSlots = [];
+    for (var row in scores) {
+      if (scores.hasOwnProperty(row)) {
+        for (var slot in scores[row][symbol]) {
+          if (scores[row][symbol].hasOwnProperty(slot)) {
+            if (slot == requiredScore) {
+              validSlots.push({typeOf: row, slot: slot});
             }
           }
-          if (score == requiredScore) {
-            return blank;
-          }
-
-          // Check vertical
-          score = 0;
-          for (var i = 0; i < board.length; i++) {
-            if (board[i][col] == symbol) {
-              score++;
-            } else if (board[i][col] !== null) {
-              score--;
-            } else {
-              blank = {row: i, col: col};
-            }
-          }
-          if (score == requiredScore) {
-            return blank;
-          }
-
-          // Check diag
-          score = 0;
-          // Top left to bottom right;
-          for (var i = 0; i < board.length; i++) {
-            if (board[i][i] == symbol) {
-              score++;
-            } else if (board[i][i] !== null) {
-              score--;
-            } else {
-              blank = {row: i, col: i};
-            }
-          }
-          if (score == requiredScore) {
-            return blank;
-          }
-
-          score = 0;
-          // top right to bottom left;
-          for (var i = 0; i < board.length; i++) {
-            if (board[i][board.length - 1 -  i] == symbol) {
-              score++;
-            } else if (board[i][board.length - 1 - i] !== null) {
-              score--;
-            } else {
-              blank = {row: i, col: board.length - 1 - i};
-            }
-          }
-          if (score == requiredScore) {
-            return blank;
-          }
-
         }
       }
     }
+  };
 
-    return false;
+  /* Helper method to look through 'spots' and give a random open space */
+  SmartPlayer.prototype.getSpot = function(slots) {
+    if (!slots.length) {
+      return false;
+    }
+
+    var i = Math.round(Math.random() * slots.length);
+    var slot = slots[i];
+
+    // There are three types of slots, horizontal, diagnol, and vertical. How we explore
+    // the selected slot depends on the type.
+    switch (slot.typeOf) {
+      case "horizontal":
+        for (var j = 0; j < this.game.board.length; j++) {
+          if (this.game.Game.prototype.getSpot(slot.slot, j) === null) {
+            return {row: slot.slot, col: j};
+          }
+        }
+        break;
+
+      case "diagnol":
+        // 0 is top left to bottom right 1 is vice versa
+        if (slot.slot) {
+          for (var j = 0; j < this.game.board.length; j++) {
+            var spot = this.getSpot(j, this.game.board.length - 1 - j);
+            if (spot === null) {
+              return {row: j, col: this.game.board.length - 1 - j};
+            }
+          }
+        } else {
+          for (var j = 0; j < this.game.board.length; j++) {
+            var spot = this.getSpot(j, this.game.board.length - 1 - j);
+            if (spot === null) {
+              return {row: j, col: this.game.board.length - 1 - j};
+            }
+          }
+        }
+        break;
+
+      case "vertical":
+        for (var j = 0; j < this.game.board.length; j++) {
+          if (this.game.Game.prototype.getSpot(slot.slot, j) === null) {
+            return {row: j, col: slot.slot};
+          }
+        }
+        break;
+    }
   }
 
-  SmartPlayer.prototype.checkSelfWin = function(board) {
-    return this.checkScore(board, this.symbol, 2);
+  /* If there is 2 in a row with an open spot for your symbol,
+     move to that spot and win. */
+  SmartPlayer.prototype.checkSelfWin = function() {
+    var scores = this.game.checkScore();
+
+    /* Check all for your scores of 2*/
+    var slots = this.testScore(this.symbol, 2);
+
+    
+    if (slots.length) {
+      var i = Math.round(Math.random() * slots.length);
+
+    }
   }
 
-  // Check to see if opponent has possible wins
-  SmartPlayer.prototype.checkOpponentWin = function(board) {
+  /* If the opponent has 2 in a row with an open spot for your opponents symbol, move to block */
+  SmartPlayer.prototype.checkOpponentWin = function() {
     var symbol = this.symbol === 'X' ? 'O' : 'X';
-    return this.checkScore(board, symbol, 2);
+    
+    /* Check all for opponent scores of 2*/
+    var slots = this.testScore(symbol, 2);
+
+    if (slots.length) {
+      var i = Math.round(Math.random() * slots.length);
+
+    }
   }
 
-  // Place next to occupied spot on board if row is open.
-  SmartPlayer.prototype.checkAdjacent = function(board) {
-    return this.checkScore(board, this.symbol, 1);
+  /* If there is a row with a score of 1 for your symbol, take */
+  SmartPlayer.prototype.checkAdjacent = function() {
+    var scores = this.checkScore();
+    
+    /* check for own scores of 1 */
+    var slots = this.testScore(this.symbol, 1);
+
+    if (slots.length) {
+      var i = Math.round(Math.random() * slots.length);
+
+    }
   }
 
-  SmartPlayer.prototype.checkCenter = function(board) {
-    if (!board[1][1]) {
+  SmartPlayer.prototype.checkCenter = function() {
+    var center = this.game.getSpot(1,1);
+    if (!center) {
       return {row: 1, col: 1};
     }
   }
 
-  SmartPlayer.prototype.checkCorners = function(board) {
+  SmartPlayer.prototype.checkCorners = function() {
     var corners = [{row: 0, col: 0}, {row: 0, col: board.length - 1}, {row: board.length - 1, col: 0}, {row: board.length - 1, col: board.length - 1}];
     var openCorners = [];
     // Find open corners. Pick one at random.
     for (var i = 0; i < corners.length; i++) {
-      if (!board[corners[i].row][corners[i].col]) {
+      if (!this.game.getSpot(corners[i].row, corners[i].col) ) {
         openCorners.push(corners[i]);
       }
     }
@@ -310,7 +415,7 @@ var SmartPlayer = function(symbol) {
       var row = Math.round(Math.random() * (board.length-1));
       var col = Math.round(Math.random() * (board[row].length -1));
 
-      if (!board[row][col]) {
+      if (!this.game.getSpot(row, col) ) {
         return {row: row, col: col};
       }
     }
