@@ -4,6 +4,7 @@ var Game = function(playerX, playerO, speed, callback) {
   this.move = 0;
   this.speed = speed !== undefined ? speed : 1000;
   this.callback = callback;
+  this.winCondition = 3;
 
   // Clear the board array, log, and TDs in preparation for a new game.
   this.clear = function() {
@@ -22,7 +23,12 @@ var Game = function(playerX, playerO, speed, callback) {
   Game.prototype.writeLog = function(player, position) {
     // Add to log!
     var listElement = document.createElement("li");
-    var logString = "Player " + player + " moved at position (" + position.row + ", " + position.col + ") using rule " + position.rule + " \n";
+    var logString = "Player " + player + " moved at position (" + position.row + ", " + position.col + ") using rule " + position.rule;
+    if (position.slot) {
+      logString += " because there was a " + position.slot.typeOf + " with a " + position.slot.symbol + " score of " + position.slot.score;
+    }
+    logString += "\n";
+
     listElement.appendChild(document.createTextNode(logString));
     document.getElementById("game-log").appendChild(listElement);
   }
@@ -145,7 +151,7 @@ var Game = function(playerX, playerO, speed, callback) {
   }
 
   Game.prototype.getSpot = function(x,y) {
-    return board[x][y];
+    return this.board[x][y];
   };
 
   Game.prototype.horizontalScores = function() {
@@ -170,6 +176,8 @@ var Game = function(playerX, playerO, speed, callback) {
         scores[symbols[symbol]][row] = score;
       }
     }
+
+    return scores;
   };
 
   Game.prototype.verticalScores = function() {
@@ -194,6 +202,8 @@ var Game = function(playerX, playerO, speed, callback) {
         scores[symbols[symbol]][col] = score;
       }
     }
+
+    return scores;
   };
 
   Game.prototype.diagScores = function() {
@@ -228,16 +238,18 @@ var Game = function(playerX, playerO, speed, callback) {
         }
       }
       scores[symbols[symbol]][1] = score;
+    }
+
+    return scores;
   };
 
   Game.prototype.checkScore = function(symbol) {
-    var symbols = ["X", "O"];
     var scores = {};
     scores.horizontal = this.horizontalScores();
     scores.vertical = this.verticalScores();
-    scores.diagnol = this.diagScores();
+    scores.diagonal = this.diagScores();
     return scores;
-  }
+  };
     
 }
 
@@ -282,19 +294,21 @@ var SmartPlayer = function(symbol, game) {
   };
 
   /* Helper method to return all "slots" with appropriate score */
-  SmartPlayer.prototype.testScore = function(symbol, requiredScore) {
+  SmartPlayer.prototype.testScore = function(scores, symbol, requiredScore) {
     var validSlots = [];
     for (var row in scores) {
       if (scores.hasOwnProperty(row)) {
         for (var slot in scores[row][symbol]) {
           if (scores[row][symbol].hasOwnProperty(slot)) {
-            if (slot == requiredScore) {
-              validSlots.push({typeOf: row, slot: slot});
+            if (scores[row][symbol][slot] == requiredScore) {
+              validSlots.push({typeOf: row, slot: slot, score: requiredScore, symbol: symbol});
             }
           }
         }
       }
     }
+
+    return validSlots;
   };
 
   /* Helper method to look through 'spots' and give a random open space */
@@ -303,7 +317,7 @@ var SmartPlayer = function(symbol, game) {
       return false;
     }
 
-    var i = Math.round(Math.random() * slots.length);
+    var i = Math.round(Math.random() * (slots.length - 1));
     var slot = slots[i];
 
     // There are three types of slots, horizontal, diagnol, and vertical. How we explore
@@ -311,26 +325,26 @@ var SmartPlayer = function(symbol, game) {
     switch (slot.typeOf) {
       case "horizontal":
         for (var j = 0; j < this.game.board.length; j++) {
-          if (this.game.Game.prototype.getSpot(slot.slot, j) === null) {
-            return {row: slot.slot, col: j};
+          if (this.game.getSpot(slot.slot, j) === null) {
+            return {row: slot.slot, col: j, slot: slot};
           }
         }
         break;
 
-      case "diagnol":
+      case "diagonal":
         // 0 is top left to bottom right 1 is vice versa
-        if (slot.slot) {
+        if (parseInt(slot.slot)) {
           for (var j = 0; j < this.game.board.length; j++) {
-            var spot = this.getSpot(j, this.game.board.length - 1 - j);
+            var spot = this.game.getSpot(j, this.game.board.length - 1 - j);
             if (spot === null) {
-              return {row: j, col: this.game.board.length - 1 - j};
+              return {row: j, col: this.game.board.length - 1 - j, slot: slot};
             }
           }
         } else {
           for (var j = 0; j < this.game.board.length; j++) {
-            var spot = this.getSpot(j, this.game.board.length - 1 - j);
+            var spot = this.game.getSpot(j, j);
             if (spot === null) {
-              return {row: j, col: this.game.board.length - 1 - j};
+              return {row: j, col: j, slot: slot};
             }
           }
         }
@@ -338,8 +352,8 @@ var SmartPlayer = function(symbol, game) {
 
       case "vertical":
         for (var j = 0; j < this.game.board.length; j++) {
-          if (this.game.Game.prototype.getSpot(slot.slot, j) === null) {
-            return {row: j, col: slot.slot};
+          if (this.game.getSpot(j, slot.slot) === null) {
+            return {row: j, col: slot.slot, slot: slot};
           }
         }
         break;
@@ -352,39 +366,31 @@ var SmartPlayer = function(symbol, game) {
     var scores = this.game.checkScore();
 
     /* Check all for your scores of 2*/
-    var slots = this.testScore(this.symbol, 2);
+    var slots = this.testScore(scores, this.symbol, this.game.winCondition - 1);
 
-    
-    if (slots.length) {
-      var i = Math.round(Math.random() * slots.length);
-
-    }
+    return this.getSpot(slots);
   }
 
   /* If the opponent has 2 in a row with an open spot for your opponents symbol, move to block */
   SmartPlayer.prototype.checkOpponentWin = function() {
-    var symbol = this.symbol === 'X' ? 'O' : 'X';
+    // var symbol = this.symbol === 'X' ? 'O' : 'X';
+
+    var scores = this.game.checkScore();
     
     /* Check all for opponent scores of 2*/
-    var slots = this.testScore(symbol, 2);
+    var slots = this.testScore(scores, this.symbol, -(this.game.winCondition - 1));
 
-    if (slots.length) {
-      var i = Math.round(Math.random() * slots.length);
-
-    }
+    return this.getSpot(slots);
   }
 
   /* If there is a row with a score of 1 for your symbol, take */
   SmartPlayer.prototype.checkAdjacent = function() {
-    var scores = this.checkScore();
+    var scores = this.game.checkScore();
     
     /* check for own scores of 1 */
-    var slots = this.testScore(this.symbol, 1);
+    var slots = this.testScore(scores, this.symbol, 1);
 
-    if (slots.length) {
-      var i = Math.round(Math.random() * slots.length);
-
-    }
+    return this.getSpot(slots);
   }
 
   SmartPlayer.prototype.checkCenter = function() {
@@ -395,7 +401,7 @@ var SmartPlayer = function(symbol, game) {
   }
 
   SmartPlayer.prototype.checkCorners = function() {
-    var corners = [{row: 0, col: 0}, {row: 0, col: board.length - 1}, {row: board.length - 1, col: 0}, {row: board.length - 1, col: board.length - 1}];
+    var corners = [{row: 0, col: 0}, {row: 0, col: this.game.board.length - 1}, {row: this.game.board.length - 1, col: 0}, {row: this.game.board.length - 1, col: this.game.board.length - 1}];
     var openCorners = [];
     // Find open corners. Pick one at random.
     for (var i = 0; i < corners.length; i++) {
@@ -412,8 +418,8 @@ var SmartPlayer = function(symbol, game) {
   // Place at random.
   SmartPlayer.prototype.checkRandom = function(board) {
     while (true) {
-      var row = Math.round(Math.random() * (board.length-1));
-      var col = Math.round(Math.random() * (board[row].length -1));
+      var row = Math.round(Math.random() * (this.game.board.length-1));
+      var col = Math.round(Math.random() * (this.game.board.length -1));
 
       if (!this.game.getSpot(row, col) ) {
         return {row: row, col: col};
@@ -421,7 +427,7 @@ var SmartPlayer = function(symbol, game) {
     }
   }
 
-  this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkCenter,  this.checkCorners, this.checkRandom];
+  this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkRandom];
 
 
 };
