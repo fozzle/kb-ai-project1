@@ -23,7 +23,7 @@ var Game = function(playerX, playerO, speed, callback) {
   Game.prototype.writeLog = function(player, position) {
     // Add to log!
     var listElement = document.createElement("li");
-    var logString = "Player " + player + " moved at position (" + position.row + ", " + position.col + ") using rule " + position.rule;
+    var logString = "Player " + player + " moved at position (" + position.row + ", " + position.col + ") using strategy " + position.strategy;
     if (position.slot) {
       logString += " because there was a " + position.slot.typeOf + " with a " + position.slot.symbol + " score of " + position.slot.score;
     }
@@ -95,6 +95,23 @@ var Game = function(playerX, playerO, speed, callback) {
     var self = this;
     setTimeout(function() { self.playHelper.apply(self, []); }, this.speed);
 
+  }
+
+  Game.prototype.strategyQuery = function(strategy) {
+    switch (strategy) {
+      case "win":
+        return this.winCondition - 1;
+        break;
+      case "block":
+        return -(this.winCondition - 1);
+        break;
+      case "build":
+        return 1;
+        break;
+      case "random":
+        return 0;
+        break
+    }
   }
 
   Game.prototype.checkWin = function(space, player) {
@@ -264,7 +281,7 @@ var NaivePlayer = function(symbol) {
       var col = Math.round(Math.random() * (board[row].length -1));
 
       if (!board[row][col]) {
-        return {row: row, col: col, rule:"random"};
+        return {row: row, col: col, rule:"random", strategy:"random"};
       }
     }
   };
@@ -284,10 +301,11 @@ var SmartPlayer = function(symbol, game) {
     * 3.) If there is a row that you have space on already and isn't blocked, add it.
     * 4.) Place something down at random.
     */
-    for (var i = 0; i < this.rules.length; i++) {
-      var position = this.rules[i].apply(this, []);
+    for (var i = 0; i < this.strategies.length; i++) {
+      var position = this.implementStrategy.apply(this, [this.strategies[i]]);
       if (position) {
         position.rule = i;
+        position.strategy = this.strategies[i];
         return position;
       }
     }
@@ -360,6 +378,17 @@ var SmartPlayer = function(symbol, game) {
     }
   }
 
+  SmartPlayer.prototype.implementStrategy = function(strategy) {
+    if (strategy === "random") {
+      return this.checkRandom();
+    }
+
+    var requiredScore = this.game.strategyQuery(strategy);
+    var slots = this.testScore(this.game.checkScore(), this.symbol, requiredScore);
+
+    return this.getSpot(slots);
+  }
+
   /* If there is 2 in a row with an open spot for your symbol,
      move to that spot and win. */
   SmartPlayer.prototype.checkSelfWin = function() {
@@ -427,8 +456,10 @@ var SmartPlayer = function(symbol, game) {
     }
   }
 
-  this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkRandom];
+  
 
+  // this.rules = [this.checkSelfWin, this.checkOpponentWin, this.checkAdjacent, this.checkRandom];
+  this.strategies = ["win", "block", "build", "random"];
 
 };
 
